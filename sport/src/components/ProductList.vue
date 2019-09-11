@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="pro">
         <div v-for="p in products" v-bind:Key="p.id" class="card m-1 p-1 bg-light">
             <h4>
                 {{p.name}}
@@ -36,3 +36,8 @@ export default {
     }
 }
 </script>
+<style scoped>
+.pro{
+    /* background-color: aliceblue !important; */
+}
+</style>
