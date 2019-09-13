@@ -5,13 +5,18 @@
                 {{p.name}}
                 <span class="badge badge-pill badge-primary float-right">{{ p.price | currency }}</span>
             </h4>
-            <div class="card-text bg-white p-1">{{ p.description }}</div>
+            <div class="card-text bg-white p-1">{{ p.description }}
+                <button class="btn btn-success btn-sm float-right"
+                         v-on:click="handleProductAdd(p)">
+                          Add To Cart
+                </button>
+            </div>
         </div>
         <page-controls/>
     </div>
 </template>
 <script>
-import { mapState, mapGetters } from 'vuex'
+import { mapState, mapGetters, mapMutations } from 'vuex'
 import PageControls from './PageControls'
 
 export default {
@@ -33,6 +38,13 @@ export default {
     },
     components: {
         PageControls
+    },
+    methods: {
+        ...mapMutations({ addProduct: "cart/addProduct" }),
+            handleProductAdd(product) {
+            this.addProduct(product);
+            this.$router.push("/cart");
+}
     }
 }
 </script>
