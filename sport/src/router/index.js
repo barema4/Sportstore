@@ -4,6 +4,12 @@ import Store from '../components/Store.vue'
 import ShopingCart from '../components/ShopingCart.vue'
 import Checkout from "../components/Checkout";
 import OrderThanks from "../components/OrderThanks";
+import Authentication from "../components/admin/Authentication";
+import Admin from "../components/admin/Admin";
+import dataStore from "../store";
+import ProductAdmin from "../components/admin/ProductAdmin";
+import OrderAdmin from "../components/admin/OrderAdmin";
+import ProductEditor from "../components/admin/ProductEditor";
 
 Vue.use(VueRouter)
 
@@ -26,6 +32,28 @@ export default new VueRouter({
         { 
             path: "/thanks/:id",
              component: OrderThanks
+            
+            },
+            { path: "/login",
+             component: Authentication
+            
+            },
+            { path: "/admin",
+             component: Admin,
+             beforeEnter(to, from, next) {
+                if (dataStore.state.auth.authenticated) {
+                next();
+                } else {
+                next("/login");
+                }
+                },
+                children: [
+                    { path: "products/:op(create|edit)/:id(\\d+)?",
+                     component: ProductEditor },
+                    { path: "products", component: ProductAdmin },
+                    { path: "orders", component: OrderAdmin },
+                    { path: "", redirect: "/admin/products"}
+                    ]
             
             },
         { 

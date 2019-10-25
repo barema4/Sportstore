@@ -3,6 +3,8 @@ import Vuex from "vuex";
 import Axios from 'axios'
 import CartModule from "./cart";
 import OrdersModule from "./orders";
+import AuthModule from './auth'
+
 
 Vue.use(Vuex)
 
@@ -12,15 +14,35 @@ const categoriesUrl = `${baseUrl}/categories`;
 
 export default new Vuex.Store({
     strict: true,
-    modules: { cart: CartModule ,orders: OrdersModule},
+    modules: { cart: CartModule ,orders: OrdersModule, auth: AuthModule},
     state: {
-        products: [],
-        productsTotal: 0,
         currentPage: 1,
         pageSize: 4,
         currentCategory: 'All',
-        categoriesData: []
+        categoriesData: [],
+        pages: [],
+        severPageCount: 0,
+        searchItem: [],
+        showSearch: false
     },
+
+    getters: {
+     
+        processedProducts: (state) => {
+            return state.pages[state.currentPage]
+        },
+
+        pageCount: (state) => {
+            return state.severPageCount
+        },
+        categories: state => ["All", ...state.categoriesData],
+
+        productById:(state) => (id) => {
+            return state.pages[state.currentPage].find(p => p.id == id);
+            },
+        },
+     
+
     mutations: {
         setCurrentPage(state, page){
             state.currentPage = page
@@ -33,31 +55,108 @@ export default new Vuex.Store({
             state.currentCategory = category
             state.currentPage = 1
         },
-        setData(state, data) {
-            state.products = data.pdata;
-            state.productsTotal = data.pdata.length;
-            state.categoriesData = data.cdata.sort();
+      
+        addPage(state, page) {
+            for (let i = 0; i < page.pageCount; i++) {
+            Vue.set(state.pages, page.number + i,
+            page.data.slice(i * state.pageSize,
+            (i * state.pageSize) + state.pageSize));
+            }
+            },
+        clearPages(state) {
+            state.pages.splice(0, state.pages.length);
+            },
+        setCategories(state, categories) {
+            state.categoriesData = categories;
+            },
+
+        setPageCount(state, count) {
+        state.serverPageCount = Math.ceil(Number(count) / state.pageSize);
+        },
+        setShowSearch(state, show){
+            state.showSearch = show
+        },
+        setSearchItem(state, term){
+            state.searchItem = term,
+            state.currentPage = 1
+        },
+        _addProduct(state, product) {
+            state.pages[state.currentPage].unshift(product);
+            },
+        _updateProduct(state, product) {
+        let page = state.pages[state.currentPage];
+        let index = page.findIndex(p => p.id == product.id);
+        Vue.set(page, index, product);
         }
     },
-    getters: {
-        productsFilteredByCategory: state => state.products
-        .filter(p => state.currentCategory == "All"
-        || p.category == state.currentCategory),
-        processedProducts: (state, getters) => {
-        let index = (state.currentPage - 1) * state.pageSize;
-        return getters.productsFilteredByCategory.slice(index,
-        index + state.pageSize);
+    actions: {
+        async getData(context) {
+        await context.dispatch("getPage", 2);
+        context.commit("setCategories", (await Axios.get(categoriesUrl)).data);
         },
-        pageCount: (state, getters) =>
-        Math.ceil(getters.productsFilteredByCategory.length / state.pageSize),
-        categories: state => ["All", ...state.categoriesData]
+
+        async getPage(context, getPageCount = 1) {
+        let url = `${productsUrl}?_page=${context.state.currentPage}`
+        + `&_limit=${context.state.pageSize * getPageCount}`;
+
+        if (context.state.currentCategory != "All") {
+        url += `&category=${context.state.currentCategory}`;
+        }
+        if (context.state.searchItem != ""){
+            url += `&q=${context.state.searchItem}`;
+        }
+        let response = await Axios.get(url);
+        context.commit("setPageCount", response.headers["x-total-count"]);
+        context.commit("addPage", { number: context.state.currentPage,
+        data: response.data, pageCount: getPageCount});
         },
-        actions: {
-            async getData(context) {
-            let pdata = (await Axios.get(productsUrl)).data;
-            let cdata = (await Axios.get(categoriesUrl)).data;
-            context.commit("setData", { pdata, cdata} );
+
+        setCurrentPage(context, page) {
+        context.commit("setCurrentPage", page);
+        if (!context.state.pages[page]) {
+        context.dispatch("getPage");
+        }
+        },
+
+        setPageSize(context, size) {
+            context.commit("clearPages");
+            context.commit("setPageSize", size);
+            context.dispatch("getPage", 2);
+            },
+
+
+        setCurrentCategory(context, category) {
+        context.commit("clearPages");
+        context.commit("setCurrentCategory", category);
+        context.dispatch("getPage", 2);
+        },
+        search(context, term){
+            context.commit('setSearchItem', term)
+            context.commit('clearPages')
+            context.dispatch("getPage", 2);
+        },
+        clearSearchItem(context){
+            context.commit('setSearchItem', '')
+            context.commit('clearPages')
+            context.commit('')
+            context.dispatch("getPage", 2);
+        },
+        async addProduct(context, product) {
+            let data = (await context.getters.authenticatedAxios.post(productsUrl,
+            product)).data;
+            product.id = data.id;
+            this.commit("_addProduct", product);
+            },
+        async removeProduct(context, product) {
+            await context.getters.authenticatedAxios
+            .delete(`${productsUrl}/${product.id}`);
+            context.commit("clearPages");
+            context.dispatch("getPage", 1);
+        },
+        async updateProduct(context, product) {
+            await context.getters.authenticatedAxios
+            .put(`${productsUrl}/${product.id}`, product);
+            this.commit("_updateProduct", product);
             }
             }
-    }
-)
+            })
